@@ -1,5 +1,6 @@
 import os
 import re
+from turtle import update
 import numpy as np 
 import pandas as pd
 import math
@@ -18,7 +19,7 @@ import matplotlib.pyplot as plt
 #        | -- Movie_%s_%d.%d.%d_298.000000_0.000000_allcomponents.pdb
 
 ch4_sigma , ch4_epsilon = 3.73, 148
-uff = pd.read_csv("/home/xiaoqi/Repo/nvt_parser/ff_data/uff.csv")
+uff = pd.read_csv("./ff_data/uff.csv")
 
 nvt_path = "./nvt_results"
 rst_path = "./parse_results"
@@ -84,16 +85,27 @@ def read_cif_atom(structure):
         atom_cif = [line.split()[0] for line in lines]
         return atom_cif
     
-def atom_label(list):
-    ele = np.unique(np.array(list))
-    list_label = list.copy()
+def atom_label(cif_list, sp_list):
+    ele = np.unique(np.array(cif_list))
+    cif_list_label = cif_list.copy()
+    sp_list_label = sp_list.copy()
     count = [0] * len(ele)
-    for idx in range(len(list)):
+    sp_count = [0] * len(ele)
+    for idx in range(len(cif_list)):
         for idj in range(len(ele)):
-            if list[idx] == ele[idj]:
+            if cif_list[idx] == ele[idj]:
                 count[idj] += 1
-                list_label[idx] = list[idx] + str(count[idj])
-    return list_label
+                cif_list_label[idx] = cif_list[idx] + str(count[idj])
+    for idx in range(len(sp_list)):
+        for idj in range(len(ele)):
+            if sp_list[idx] == ele[idj]:
+                if sp_count[idj] < count[idj]:
+                    sp_count[idj] += 1
+                else:
+                    sp_count[idj] = 1
+                sp_list_label[idx] = sp_list[idx] + str(sp_count[idj])       
+
+    return cif_list_label, sp_list_label
 
 #@click.command()
 #@click.option("--structure")
@@ -103,7 +115,11 @@ def run(structure):
 
     sc = get_supercell(structure)
     sp_cry = Structure.from_file(os.path.join(nvt_path, "%s/Movies/System_0/Framework_0_final.vasp" %structure))
-    un_cry = sp_cry.get_primitive_structure()
+    #un_cry = sp_cry.get_primitive_structure()
+    un_cry  = sp_cry
+
+    #if (sc == [1, 1, 1]) and (len(sp_cry.sites) != len(un_cry.sites)):
+        #un_cry = sp_cry
 
     site_sigma = [uff.loc[uff["element"] == site.specie.symbol]["lb_sigma"].values for site in un_cry.sites]
     site_epsilon = [uff.loc[uff["element"] == site.specie.symbol]["lb_epsilon"].values for site in un_cry.sites]
@@ -114,7 +130,7 @@ def run(structure):
         data = file.readlines()
         atom_pos = np.array([np.array([float(i) for i in line.split()[4:7]]) for line in data if "ATOM" in line])
 
-    threshold = 3.8
+    threshold = 7
     sphere_sites = np.array([[site for site in un_cry.get_sites_in_sphere(pt=pos, r=threshold) if site.specie.symbol!="H"] 
                                 for pos in atom_pos], dtype=object)
     #sphere_sites = np.array([un_cry.get_sites_in_sphere(pt=pos, r=threshold) for pos in atom_pos], dtype=object)
@@ -143,17 +159,24 @@ def run(structure):
     weights = np.array([np.sum(site.properties["weight"]) for site in un_cry.sites])
     atom_lst = [site.specie.symbol for site in un_cry.sites]
 
-    violin_plot(structure, atom_lst, weights)
-
     atom_cif = read_cif_atom(structure)
-    atom_cif_label = atom_label(atom_cif)
-    atom_lst_label = atom_label(atom_lst)
+    atom_cif_label, atom_lst_label = atom_label(atom_cif, atom_lst)
 
     cif_weight = {}
     for i in range(len(atom_cif_label)):
         for j in range(len(atom_lst_label)):
             if atom_cif_label[i] == atom_lst_label[j]:
-                cif_weight.update({atom_cif_label[i]: weights[j]})
+                if atom_cif_label[i] not in cif_weight:
+                    cif_weight.update({atom_cif_label[i]: weights[j]})
+                else:
+                    cif_weight[atom_cif_label[i]] += weights[j]
+    
+    uc_weight = [cif_weight[i] for i in cif_weight]
+    uc_weight = [w/np.array(uc_weight).max() for w in uc_weight]
+    cif_weight = {}
+    for i, j in zip(atom_cif_label, uc_weight):
+        cif_weight.update({i: j})
+    violin_plot(structure, atom_cif, uc_weight)
 
     with open(os.path.join(rst_path, "weight_json/%s.json" %structure), 'w') as json_file:
         json.dump(cif_weight, json_file)
