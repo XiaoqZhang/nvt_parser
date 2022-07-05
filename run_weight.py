@@ -145,7 +145,7 @@ def run(structure):
 
     min = po_ana.min()
     max = po_ana.max()
-    po_norm = (po_ana - min) / (max - min)
+    po_norm = -((po_ana - min) / (max - min) - 1)
     #po_sigmoid = np.exp(-po_ana/abs(np.min(po_ana))) / np.sum(np.exp(-po_ana/abs(np.min(po_ana))))
 
     dist_plot(structure, po_ana)
