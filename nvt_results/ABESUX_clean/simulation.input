@@ -13,7 +13,7 @@ UseChargesFromCIFFile   yes
 UnitCells               2 2 2
 ExternalTemperature     298
 Movies                  yes
-WriteMoviesEvery        10
+WriteMoviesEvery        1
 
 Component 0 MoleculeName                 methane
             MoleculeDefinition           UFFTraPPE

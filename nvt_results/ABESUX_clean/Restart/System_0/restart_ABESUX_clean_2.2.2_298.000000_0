@@ -45,9 +45,9 @@ Reactions: 0
 
 Component: 0     Adsorbate    1 molecules of methane
 ------------------------------------------------------------------------
-Adsorbate-atom-position: 0 0     7.902486098195     3.071550592835     5.029459918188
-Adsorbate-atom-velocity: 0 0    -2.960941428476    -6.815350258941    -3.642094211802
-Adsorbate-atom-force:    0 0    51.988736160093    33.491985563155   -22.404143614085
+Adsorbate-atom-position: 0 0    23.073585215557    13.959786468046    15.408827309308
+Adsorbate-atom-velocity: 0 0    -4.290509456823    -3.103880184465     1.907140433155
+Adsorbate-atom-force:    0 0   580.052303353909   -69.925950719468  -125.589018590903
 Adsorbate-atom-charge:   0 0     0.000000000000
 Adsorbate-atom-scaling:  0 0     1.000000000000
 Adsorbate-atom-fixed:    0 0       0 0 0

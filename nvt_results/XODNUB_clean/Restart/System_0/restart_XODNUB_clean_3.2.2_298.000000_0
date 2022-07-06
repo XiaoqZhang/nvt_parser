@@ -1,0 +1,55 @@
+Cell info:
+========================================================================
+number-of-unit-cells: 3 2 2
+unit-cell-vector-a:    12.774500000000     0.000000000000     0.000000000000
+unit-cell-vector-b:     3.996478757626    13.605166575233     0.000000000000
+unit-cell-vector-c:     0.466790063400     4.825529267585    13.688964998654
+
+cell-vector-a:    38.323500000000     0.000000000000     0.000000000000
+cell-vector-b:     7.992957515251    27.210333150467     0.000000000000
+cell-vector-c:     0.933580126801     9.651058535171    27.377929997309
+
+cell-lengths:    12.774500000000    14.180000000000    14.522100000000
+cell-angles:    70.860000000000    88.158000000000    73.630000000000
+
+
+Maximum changes for MC-moves:
+========================================================================
+Maximum-volume-change: 0.001563
+Maximum-Gibbs-volume-change: 0.006250
+Maximum-box-shape-change: 0.100000 0.100000 0.100000, 0.100000 0.100000 0.100000, 0.100000 0.100000 0.100000
+
+
+Acceptance targets for MC-moves:
+========================================================================
+Target-volume-change: 0.500000
+Target-box-shape-change: 0.500000
+Target-Gibbs-volume-change: 0.500000
+
+
+Components: 1 (Adsorbates 1, Cations 0)
+========================================================================
+Component 0 (methane)
+	Fractional-molecule-id component 0: -1
+	Lambda-factors component 0:  0.000000
+	Number-of-biasing-factors component 0: 21
+	Biasing-factors component 0:  0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000
+	Maximum-CF-Lambda-change component 0: 0.500000
+	Maximum-CBCF-Lambda-change component 0: 0.500000
+
+	Maximum-translation-change component 0: 0.982261,1.000000,1.000000
+	Maximum-translation-in-plane-change component 0: 0.000000,0.000000,0.000000
+	Maximum-rotation-change component 0: 0.736311 0.736311 2.208932
+
+Reactions: 0
+
+Component: 0     Adsorbate    1 molecules of methane
+------------------------------------------------------------------------
+Adsorbate-atom-position: 0 0    20.720109897029    30.911563048655    13.375101212729
+Adsorbate-atom-velocity: 0 0    -1.275865077325    -7.181360209622    -1.315853069520
+Adsorbate-atom-force:    0 0  -382.668862535492   317.440015121575  -256.761843063778
+Adsorbate-atom-charge:   0 0     0.000000000000
+Adsorbate-atom-scaling:  0 0     1.000000000000
+Adsorbate-atom-fixed:    0 0       0 0 0
+
+

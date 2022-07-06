@@ -1,3 +1,5 @@
+from cmath import nan
+from copy import copy
 import os
 import re
 from turtle import update
@@ -20,6 +22,8 @@ import matplotlib.pyplot as plt
 
 ch4_sigma , ch4_epsilon = 3.73, 148
 uff = pd.read_csv("./ff_data/uff.csv")
+
+#threshold = 12
 
 nvt_path = "./nvt_results"
 rst_path = "./parse_results"
@@ -111,15 +115,12 @@ def atom_label(cif_list, sp_list):
 #@click.option("--structure")
 
 # Run the functions
-def run(structure):
+def run(structure, threshold):
 
     sc = get_supercell(structure)
     sp_cry = Structure.from_file(os.path.join(nvt_path, "%s/Movies/System_0/Framework_0_final.vasp" %structure))
     #un_cry = sp_cry.get_primitive_structure()
     un_cry  = sp_cry
-
-    #if (sc == [1, 1, 1]) and (len(sp_cry.sites) != len(un_cry.sites)):
-        #un_cry = sp_cry
 
     site_sigma = [uff.loc[uff["element"] == site.specie.symbol]["lb_sigma"].values for site in un_cry.sites]
     site_epsilon = [uff.loc[uff["element"] == site.specie.symbol]["lb_epsilon"].values for site in un_cry.sites]
@@ -130,33 +131,31 @@ def run(structure):
         data = file.readlines()
         atom_pos = np.array([np.array([float(i) for i in line.split()[4:7]]) for line in data if "ATOM" in line])
 
-    threshold = 7
-    sphere_sites = np.array([[site for site in un_cry.get_sites_in_sphere(pt=pos, r=threshold) if site.specie.symbol!="H"] 
+    sphere_sites = np.array([[site for site in un_cry.get_sites_in_sphere(pt=pos, r=threshold) if site.specie.symbol != "H"] 
                                 for pos in atom_pos], dtype=object)
-    #sphere_sites = np.array([un_cry.get_sites_in_sphere(pt=pos, r=threshold) for pos in atom_pos], dtype=object)
 
     dist = np.array([np.array([site.distance_from_point(atom_pos[idx]) for site in sphere_sites[idx]]) 
                         for idx in range(len(atom_pos))], dtype=object)
     potential = np.array([np.array([lj(sphere_sites[i][j].properties["lb_sigma"], sphere_sites[i][j].properties["lb_epsilon"], dist[i][j]) 
-                            if sphere_sites[i][j].specie.symbol!="H" else np.array([0])
                             for j in range(len(sphere_sites[i]))]).flatten() 
                             for i in range(len(atom_pos))], dtype=object)
-    po_ana = np.hstack(potential)
 
-    min = po_ana.min()
-    max = po_ana.max()
-    po_norm = -((po_ana - min) / (max - min) - 1)
-    #po_sigmoid = np.exp(-po_ana/abs(np.min(po_ana))) / np.sum(np.exp(-po_ana/abs(np.min(po_ana))))
+    mins = [po.min() if len(po)!=0 else np.nan for po in potential]
+    maxs = [po.max() if len(po)!=0 else np.nan for po in potential]
+    po_norm = np.array([-((po-min)/(max-min)-1) for min, max, po in zip(mins, maxs, potential)], dtype=object)
+    po_norm = np.hstack(po_norm)
 
-    dist_plot(structure, po_ana)
-    scale_pot_plot(structure, po_ana, po_norm)
+    #dist_plot(structure, po_ana)
+    scale_pot_plot(structure, np.hstack(potential), po_norm)
 
     idx = 0
     for i in range(sphere_sites.shape[0]):
         for j in range(len(sphere_sites[i])):
             sphere_sites[i][j].properties["weight"].append(po_norm[idx])
             idx += 1
-    weights = np.array([np.sum(site.properties["weight"]) for site in un_cry.sites])
+    weights = np.array([np.average(site.properties["weight"]) if len(site.properties["weight"])!=0 else 0 
+                            for site in un_cry.sites])
+    np.nan_to_num(weights, copy=False, nan=0)
     atom_lst = [site.specie.symbol for site in un_cry.sites]
 
     atom_cif = read_cif_atom(structure)
@@ -171,17 +170,20 @@ def run(structure):
                 else:
                     cif_weight[atom_cif_label[i]] += weights[j]
     
-    uc_weight = [cif_weight[i] for i in cif_weight]
-    uc_weight = [w/np.array(uc_weight).max() for w in uc_weight]
+    uc_weight = [cif_weight[i]/(sc[0]*sc[1]*sc[2]) for i in cif_weight]
     cif_weight = {}
     for i, j in zip(atom_cif_label, uc_weight):
         cif_weight.update({i: j})
     violin_plot(structure, atom_cif, uc_weight)
 
-    with open(os.path.join(rst_path, "weight_json/%s.json" %structure), 'w') as json_file:
+    with open(os.path.join(rst_path, "weight_json/%s_%s.json" %(structure, str(threshold))), 'w') as json_file:
         json.dump(cif_weight, json_file)
 
 if __name__ == '__main__':
-    structure_lst = os.listdir(nvt_path)
-    for structure in structure_lst:
-        run(structure)
+    #structure_lst = os.listdir(nvt_path)
+
+    thre = [8, 12, 15, 20]
+    structure = "ABESUX_clean"
+    for t in thre:
+        print(t)
+        run(structure, t)
