@@ -8,6 +8,7 @@ import pandas as pd
 import math
 import click
 import json
+import concurrent.futures
 
 from pymatgen.core import Structure
 
@@ -23,10 +24,10 @@ import matplotlib.pyplot as plt
 ch4_sigma , ch4_epsilon = 3.73, 148
 uff = pd.read_csv("./ff_data/uff.csv")
 
-#threshold = 12
+threshold = 12
 
-nvt_path = "./nvt_results"
-rst_path = "./parse_results"
+nvt_path = "/home/xiaoqi/molsim/core_ch4_nvt"
+rst_path = "/home/xiaoqi/molsim/core_ch4_parse"
 
 def get_supercell(structure):
     with open(os.path.join(nvt_path, "%s/simulation.input" %structure)) as f_input:
@@ -115,7 +116,7 @@ def atom_label(cif_list, sp_list):
 #@click.option("--structure")
 
 # Run the functions
-def run(structure, threshold):
+def run(structure):
 
     sc = get_supercell(structure)
     sp_cry = Structure.from_file(os.path.join(nvt_path, "%s/Movies/System_0/Framework_0_final.vasp" %structure))
@@ -146,7 +147,7 @@ def run(structure, threshold):
     po_norm = np.hstack(po_norm)
 
     #dist_plot(structure, po_ana)
-    scale_pot_plot(structure, np.hstack(potential), po_norm)
+    #scale_pot_plot(structure, np.hstack(potential), po_norm)
 
     idx = 0
     for i in range(sphere_sites.shape[0]):
@@ -180,10 +181,6 @@ def run(structure, threshold):
         json.dump(cif_weight, json_file)
 
 if __name__ == '__main__':
-    #structure_lst = os.listdir(nvt_path)
-
-    thre = [8, 12, 15, 20]
-    structure = "ABESUX_clean"
-    for t in thre:
-        print(t)
-        run(structure, t)
+    structure_lst = os.listdir(nvt_path)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=6) as executor:
+        executor.map(run, structure_lst)
