@@ -9,6 +9,7 @@ import math
 import click
 import json
 import concurrent.futures
+from numpyencoder import NumpyEncoder
 
 from pymatgen.core import Structure
 
@@ -26,8 +27,8 @@ uff = pd.read_csv("./ff_data/uff.csv")
 
 threshold = 15
 
-nvt_path = "/home/xiaoqi/Repo/nvt_parser/nvt_results"
-rst_path = "/home/xiaoqi/Repo/nvt_parser/parse_results"
+nvt_path = "./nvt_results"
+rst_path = "./parse_results"
 
 def get_supercell(structure):
     with open(os.path.join(nvt_path, "%s/simulation.input" %structure)) as f_input:
@@ -140,6 +141,7 @@ def run(structure):
                             for j in range(len(sphere_sites[i]))]).flatten() 
                             for i in range(len(atom_pos))], dtype=object)
 
+    np.seterr(invalid='ignore')
     mins = [po.min() if len(po)!=0 else np.nan for po in potential]
     maxs = [po.max() if len(po)!=0 else np.nan for po in potential]
     po_norm = np.array([-((po-min)/(max-min)-1) for min, max, po in zip(mins, maxs, potential)], dtype=object)
@@ -185,8 +187,9 @@ def run(structure):
 
 if __name__ == '__main__':
     structure_lst = os.listdir(nvt_path)
-    with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=15) as executor:
         result = list(executor.map(run, structure_lst))
 
+    dumped = json.dumps(result, cls=NumpyEncoder)
     with open(os.path.join(rst_path, "weights.json"), "w") as file:
-        json.dump(result, file)
+        json.dump(dumped, file)
