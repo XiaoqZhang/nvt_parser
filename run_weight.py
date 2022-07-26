@@ -157,10 +157,8 @@ def run(structure):
                             for site in un_cry.sites])
     np.nan_to_num(weights, copy=False, nan=0)
     
-    result.update({structure: weights})
-    print(result)
-    return result
-    """
+    return {structure: weights}
+"""
     atom_lst = [site.specie.symbol for site in un_cry.sites]
 
     atom_cif = read_cif_atom(structure)
@@ -183,13 +181,12 @@ def run(structure):
 
     with open(os.path.join(rst_path, "weight_json/%s_%s.json" %(structure, str(threshold))), 'w') as json_file:
         json.dump(cif_weight, json_file)
-    """
+"""
 
 if __name__ == '__main__':
     structure_lst = os.listdir(nvt_path)
-    result = {}
-    with concurrent.futures.ProcessPoolExecutor(max_workers=6) as executor:
-        executor.map(run, structure_lst)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
+        result = list(executor.map(run, structure_lst))
 
     with open(os.path.join(rst_path, "weights.json"), "w") as file:
         json.dump(result, file)
