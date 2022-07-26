@@ -24,10 +24,10 @@ import matplotlib.pyplot as plt
 ch4_sigma , ch4_epsilon = 3.73, 148
 uff = pd.read_csv("./ff_data/uff.csv")
 
-threshold = 12
+threshold = 15
 
-nvt_path = "/home/xiaoqi/molsim/core_ch4_nvt"
-rst_path = "/home/xiaoqi/molsim/core_ch4_parse"
+nvt_path = "/home/xiaoqi/Repo/nvt_parser/nvt_results"
+rst_path = "/home/xiaoqi/Repo/nvt_parser/parse_results"
 
 def get_supercell(structure):
     with open(os.path.join(nvt_path, "%s/simulation.input" %structure)) as f_input:
@@ -61,7 +61,7 @@ def violin_plot(structure, atom_lst, weights):
     axs.set_xticklabels(ele)
     axs.tick_params(labelsize=fs, labelrotation=45)
     axs.set_ylabel("weight", fontdict={"fontsize": 20})
-    fig.savefig(os.path.join(rst_path, "violin_plots/%s.png" %structure))
+    fig.savefig(os.path.join(rst_path, "violin_plots/%s_%s.png" %(structure, str(threshold))))
     plt.close(fig)
     return None
 
@@ -117,11 +117,10 @@ def atom_label(cif_list, sp_list):
 
 # Run the functions
 def run(structure):
+    print(structure)
 
     sc = get_supercell(structure)
-    sp_cry = Structure.from_file(os.path.join(nvt_path, "%s/Movies/System_0/Framework_0_final.vasp" %structure))
-    #un_cry = sp_cry.get_primitive_structure()
-    un_cry  = sp_cry
+    un_cry = Structure.from_file(os.path.join(nvt_path, "%s/%s.cif" %(structure, structure)))
 
     site_sigma = [uff.loc[uff["element"] == site.specie.symbol]["lb_sigma"].values for site in un_cry.sites]
     site_epsilon = [uff.loc[uff["element"] == site.specie.symbol]["lb_epsilon"].values for site in un_cry.sites]
@@ -157,6 +156,11 @@ def run(structure):
     weights = np.array([np.average(site.properties["weight"]) if len(site.properties["weight"])!=0 else 0 
                             for site in un_cry.sites])
     np.nan_to_num(weights, copy=False, nan=0)
+    
+    result.update({structure: weights})
+    print(result)
+    return result
+    """
     atom_lst = [site.specie.symbol for site in un_cry.sites]
 
     atom_cif = read_cif_atom(structure)
@@ -179,8 +183,13 @@ def run(structure):
 
     with open(os.path.join(rst_path, "weight_json/%s_%s.json" %(structure, str(threshold))), 'w') as json_file:
         json.dump(cif_weight, json_file)
+    """
 
 if __name__ == '__main__':
     structure_lst = os.listdir(nvt_path)
+    result = {}
     with concurrent.futures.ProcessPoolExecutor(max_workers=6) as executor:
         executor.map(run, structure_lst)
+
+    with open(os.path.join(rst_path, "weights.json"), "w") as file:
+        json.dump(result, file)
