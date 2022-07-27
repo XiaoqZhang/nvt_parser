@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 # Files required
 #   | structure_folder
 #   | -- simulation.input
+#   | -- structure.cif
 #   | -- Movies/System_0
 #   |    | -- Framework_0_final.vasp
 #        | -- Movie_%s_%d.%d.%d_298.000000_0.000000_allcomponents.pdb
@@ -37,6 +38,13 @@ def get_supercell(structure):
                 s1, s2, s3 = line.split()[1], line.split()[2], line.split()[3]
     supercell = [int(s1), int(s2), int(s3)]
     return supercell
+
+def get_lattice(structure):
+    with open("nvt_results/%s/Movies/System_0/Framework_0_final.vasp" %structure) as file:
+        lines = file.readlines()
+        lines = lines[2:5]
+        lattice = [[float(l) for l in line.split()] for line in lines]
+    return lattice
 
 def lj(sigma_lb, epsilon_lb, distance):
     u_lj = 4 * epsilon_lb * ((sigma_lb/distance)**12 - (sigma_lb/distance)**6)
@@ -118,10 +126,12 @@ def atom_label(cif_list, sp_list):
 
 # Run the functions
 def run(structure):
-    print(structure)
 
     sc = get_supercell(structure)
     un_cry = Structure.from_file(os.path.join(nvt_path, "%s/%s.cif" %(structure, structure)))
+
+    latt = get_lattice(structure)
+    un_cry.lattice = [np.array(latt[0])/sc[0], np.array(latt[1])/sc[1], np.array(latt[2])/sc[2]]
 
     site_sigma = [uff.loc[uff["element"] == site.specie.symbol]["lb_sigma"].values for site in un_cry.sites]
     site_epsilon = [uff.loc[uff["element"] == site.specie.symbol]["lb_epsilon"].values for site in un_cry.sites]
@@ -158,6 +168,8 @@ def run(structure):
     weights = np.array([np.average(site.properties["weight"]) if len(site.properties["weight"])!=0 else 0 
                             for site in un_cry.sites])
     np.nan_to_num(weights, copy=False, nan=0)
+
+    print("%s Done" %structure)
     
     return {structure: weights}
 """
