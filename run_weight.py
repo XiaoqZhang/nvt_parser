@@ -28,6 +28,9 @@ uff = pd.read_csv("./ff_data/uff.csv")
 
 threshold = 15
 
+#nvt_path = "/run/user/1001/gvfs/smb-share:server=lsmosrv2.epfl.ch,share=xiazhang/core_ch4_nvt"
+#rst_path = "./parse_results"
+
 nvt_path = "./nvt_results"
 rst_path = "./parse_results"
 
@@ -40,7 +43,7 @@ def get_supercell(structure):
     return supercell
 
 def get_lattice(structure):
-    with open("nvt_results/%s/Movies/System_0/Framework_0_final.vasp" %structure) as file:
+    with open(os.path.join(nvt_path, "%s/Movies/System_0/Framework_0_final.vasp" %structure)) as file:
         lines = file.readlines()
         lines = lines[2:5]
         lattice = [[float(l) for l in line.split()] for line in lines]
@@ -126,7 +129,6 @@ def atom_label(cif_list, sp_list):
 
 # Run the functions
 def run(structure):
-
     sc = get_supercell(structure)
     un_cry = Structure.from_file(os.path.join(nvt_path, "%s/%s.cif" %(structure, structure)))
 
@@ -171,7 +173,7 @@ def run(structure):
 
     print("%s Done" %structure)
     
-    return {structure: weights}
+    return {structure: list(weights)}
 """
     atom_lst = [site.specie.symbol for site in un_cry.sites]
 
@@ -199,9 +201,15 @@ def run(structure):
 
 if __name__ == '__main__':
     structure_lst = os.listdir(nvt_path)
-    with concurrent.futures.ProcessPoolExecutor(max_workers=15) as executor:
+    dumped = {}
+    for structure in structure_lst:
+        if os.path.exists(os.path.join(nvt_path, "%s/Movies/System_0/Framework_0_final.vasp" %structure)) == False:
+            print("%s undone!" %structure)
+            structure_lst.remove(structure)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
         result = list(executor.map(run, structure_lst))
-
-    dumped = json.dumps(result, cls=NumpyEncoder)
+    for r in result:
+        dumped.update(r)
+    #dumped = json.dumps(dumped, cls=NumpyEncoder)
     with open(os.path.join(rst_path, "weights.json"), "w") as file:
-        json.dump(dumped, file)
+        json.dump(dumped, file, indent=4)
