@@ -9,7 +9,6 @@ import math
 import click
 import json
 import concurrent.futures
-from numpyencoder import NumpyEncoder
 
 from pymatgen.core import Structure
 
@@ -26,12 +25,9 @@ import matplotlib.pyplot as plt
 ch4_sigma , ch4_epsilon = 3.73, 148
 uff = pd.read_csv("./ff_data/uff.csv")
 
-threshold = 15
+threshold = 12
 
-#nvt_path = "/run/user/1001/gvfs/smb-share:server=lsmosrv2.epfl.ch,share=xiazhang/core_ch4_nvt"
-#rst_path = "./parse_results"
-
-nvt_path = "./nvt_results"
+nvt_path = "/run/user/1001/gvfs/smb-share:server=lsmosrv2.epfl.ch,share=xiazhang/core_ch4_nvt"
 rst_path = "./parse_results"
 
 def get_supercell(structure):
@@ -53,76 +49,6 @@ def lj(sigma_lb, epsilon_lb, distance):
     u_lj = 4 * epsilon_lb * ((sigma_lb/distance)**12 - (sigma_lb/distance)**6)
     return u_lj
 
-def violin_plot(structure, atom_lst, weights):
-    key_weight = {}
-    for idx in range(len(weights)):
-        if atom_lst[idx] not in key_weight:
-            key_weight.update({atom_lst[idx]: weights[idx]})
-        else:
-            key_weight[atom_lst[idx]] = np.append(key_weight[atom_lst[idx]], weights[idx])
-    ele = [key for key in key_weight.keys()]
-    data = [key_weight[key] for key in key_weight.keys()]
-    pos = np.arange(len(ele))
-
-    fs = 15  # fontsize
-    fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(10, 6))
-    axs.violinplot(data, pos, widths=0.3,
-                     showmeans=True, showextrema=True, showmedians=True)
-    axs.plot([0,len(ele)-1], [0, 0], linestyle='dashed')
-    axs.set_xticks(np.arange(len(ele)))
-    axs.set_xticklabels(ele)
-    axs.tick_params(labelsize=fs, labelrotation=45)
-    axs.set_ylabel("weight", fontdict={"fontsize": 20})
-    fig.savefig(os.path.join(rst_path, "violin_plots/%s_%s.png" %(structure, str(threshold))))
-    plt.close(fig)
-    return None
-
-def dist_plot(structure, potential):
-    fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(10, 6))
-    axs.hist(potential, bins=100)
-    axs.set_xlabel("Lennard-Jones potential [kJ/mol]", fontdict={"fontsize": 20})
-    axs.set_ylabel("Times", fontdict={"fontsize": 20})
-    fig.savefig(os.path.join(rst_path, "dist_plots/%s.png" %structure))
-    plt.close(fig)
-    return None
-
-def scale_pot_plot(structure, po_ori, po_scl):
-    fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(10, 6))
-    axs.scatter(po_ori, po_scl, s=5, marker="x")
-    axs.set_xlabel("Lennard-Jones potential [kJ/mol]", fontdict={"fontsize": 20})
-    axs.set_ylabel("Scaled Lennard-Jones potential", fontdict={"fontsize": 20})
-    fig.savefig(os.path.join(rst_path, "scale_po_plots/%s.png" %structure))
-    plt.close(fig)
-    return None
-
-def read_cif_atom(structure):
-    with open(os.path.join(nvt_path, "%s/%s.cif" %(structure,structure))) as f_framework:
-        lines = f_framework.readlines()
-        lines = lines[23:]
-        atom_cif = [line.split()[0] for line in lines]
-        return atom_cif
-    
-def atom_label(cif_list, sp_list):
-    ele = np.unique(np.array(cif_list))
-    cif_list_label = cif_list.copy()
-    sp_list_label = sp_list.copy()
-    count = [0] * len(ele)
-    sp_count = [0] * len(ele)
-    for idx in range(len(cif_list)):
-        for idj in range(len(ele)):
-            if cif_list[idx] == ele[idj]:
-                count[idj] += 1
-                cif_list_label[idx] = cif_list[idx] + str(count[idj])
-    for idx in range(len(sp_list)):
-        for idj in range(len(ele)):
-            if sp_list[idx] == ele[idj]:
-                if sp_count[idj] < count[idj]:
-                    sp_count[idj] += 1
-                else:
-                    sp_count[idj] = 1
-                sp_list_label[idx] = sp_list[idx] + str(sp_count[idj])       
-
-    return cif_list_label, sp_list_label
 
 #@click.command()
 #@click.option("--structure")
@@ -159,9 +85,6 @@ def run(structure):
     po_norm = np.array([-((po-min)/(max-min)-1) for min, max, po in zip(mins, maxs, potential)], dtype=object)
     po_norm = np.hstack(po_norm)
 
-    #dist_plot(structure, po_ana)
-    #scale_pot_plot(structure, np.hstack(potential), po_norm)
-
     idx = 0
     for i in range(sphere_sites.shape[0]):
         for j in range(len(sphere_sites[i])):
@@ -170,34 +93,9 @@ def run(structure):
     weights = np.array([np.average(site.properties["weight"]) if len(site.properties["weight"])!=0 else 0 
                             for site in un_cry.sites])
     np.nan_to_num(weights, copy=False, nan=0)
-
+    
     print("%s Done" %structure)
-    
     return {structure: list(weights)}
-"""
-    atom_lst = [site.specie.symbol for site in un_cry.sites]
-
-    atom_cif = read_cif_atom(structure)
-    atom_cif_label, atom_lst_label = atom_label(atom_cif, atom_lst)
-
-    cif_weight = {}
-    for i in range(len(atom_cif_label)):
-        for j in range(len(atom_lst_label)):
-            if atom_cif_label[i] == atom_lst_label[j]:
-                if atom_cif_label[i] not in cif_weight:
-                    cif_weight.update({atom_cif_label[i]: weights[j]})
-                else:
-                    cif_weight[atom_cif_label[i]] += weights[j]
-    
-    uc_weight = [cif_weight[i]/(sc[0]*sc[1]*sc[2]) for i in cif_weight]
-    cif_weight = {}
-    for i, j in zip(atom_cif_label, uc_weight):
-        cif_weight.update({i: j})
-    violin_plot(structure, atom_cif, uc_weight)
-
-    with open(os.path.join(rst_path, "weight_json/%s_%s.json" %(structure, str(threshold))), 'w') as json_file:
-        json.dump(cif_weight, json_file)
-"""
 
 if __name__ == '__main__':
     structure_lst = os.listdir(nvt_path)
@@ -210,6 +108,5 @@ if __name__ == '__main__':
         result = list(executor.map(run, structure_lst))
     for r in result:
         dumped.update(r)
-    #dumped = json.dumps(dumped, cls=NumpyEncoder)
     with open(os.path.join(rst_path, "weights.json"), "w") as file:
         json.dump(dumped, file, indent=4)
