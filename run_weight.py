@@ -23,12 +23,16 @@ import matplotlib.pyplot as plt
 #        | -- Movie_%s_%d.%d.%d_298.000000_0.000000_allcomponents.pdb
 
 ch4_sigma , ch4_epsilon = 3.73, 148
+c_sigma, c_epsilon = 2.8, 27.0
+o_sigma, o_epsilon = 3.05, 79.0
 uff = pd.read_csv("./ff_data/uff.csv")
 
-threshold = 12
+threshold = 20
 
-nvt_path = "/run/user/1001/gvfs/smb-share:server=lsmosrv2.epfl.ch,share=xiazhang/core_ch4_nvt"
-rst_path = "./parse_results"
+#nvt_path = "/run/user/1001/gvfs/smb-share:server=lsmosrv2.epfl.ch,share=xiazhang/core_ch4_nvt"
+#nvt_path = "./nvt_results"
+nvt_path = "./nvt_results"
+rst_path = "./parse_results_co2"
 
 def get_supercell(structure):
     with open(os.path.join(nvt_path, "%s/simulation.input" %structure)) as f_input:
@@ -49,35 +53,56 @@ def lj(sigma_lb, epsilon_lb, distance):
     u_lj = 4 * epsilon_lb * ((sigma_lb/distance)**12 - (sigma_lb/distance)**6)
     return u_lj
 
-
-#@click.command()
-#@click.option("--structure")
-
 # Run the functions
 def run(structure):
+    print("Pharsing %s" %structure)
     sc = get_supercell(structure)
-    un_cry = Structure.from_file(os.path.join(nvt_path, "%s/%s.cif" %(structure, structure)))
+    un_cry = Structure.from_file(os.path.join(nvt_path, "%s/Movies/System_0/Framework_0_final_%s_%s_%s_P1.cif" %(structure, sc[0], sc[1], sc[2])))
 
     latt = get_lattice(structure)
-    un_cry.lattice = [np.array(latt[0])/sc[0], np.array(latt[1])/sc[1], np.array(latt[2])/sc[2]]
+    #un_cry.lattice = [np.array(latt[0])/sc[0], np.array(latt[1])/sc[1], np.array(latt[2])/sc[2]]
 
-    site_sigma = [uff.loc[uff["element"] == site.specie.symbol]["lb_sigma"].values for site in un_cry.sites]
-    site_epsilon = [uff.loc[uff["element"] == site.specie.symbol]["lb_epsilon"].values for site in un_cry.sites]
+
+    ele_sigma = [uff.loc[uff["element"] == site.specie.symbol]["sigma"].values for site in un_cry.sites]
+    ele_epsilon = [uff.loc[uff["element"] == site.specie.symbol]["epsilon"].values for site in un_cry.sites]
+    site_sigma_c = [(s+c_sigma)/2 for s in ele_sigma]
+    site_epsilon_c = [math.sqrt(e*c_epsilon) for e in ele_epsilon]
+    site_sigma_o = [(s+o_sigma)/2 for s in ele_sigma]
+    site_epsilon_o = [math.sqrt(e*o_epsilon) for e in ele_epsilon]
     for i in range(len(un_cry.sites)):
-        un_cry.sites[i].properties = {"lb_sigma": site_sigma[i], "lb_epsilon": site_epsilon[i], "weight": []}
+        un_cry.sites[i].properties = {
+            "lb_sigma_c": site_sigma_c[i], "lb_epsilon_c": site_epsilon_c[i], 
+            "lb_sigma_o": site_sigma_o[i], "lb_epsilon_o": site_epsilon_o[i],
+            "weight": []
+        }
     
     with open(os.path.join(nvt_path, "%s/Movies/System_0/Movie_%s_%d.%d.%d_298.000000_0.000000_allcomponents.pdb" %(structure, structure, sc[0], sc[1], sc[2]))) as file:
         data = file.readlines()
-        atom_pos = np.array([np.array([float(i) for i in line.split()[4:7]]) for line in data if "ATOM" in line])
+        atom_pos_o1 = np.array([np.array([float(i) for i in line.split()[4:7]]) for line in data if ("ATOM" in line and line[1] == "1")])
+        atom_pos_o2 = np.array([np.array([float(i) for i in line.split()[4:7]]) for line in data if ("ATOM" in line and line[1] == "3")])
+        atom_pos_c = np.array([np.array([float(i) for i in line.split()[4:7]]) for line in data if ("ATOM" in line and line[1] == "2")])
 
     sphere_sites = np.array([[site for site in un_cry.get_sites_in_sphere(pt=pos, r=threshold) if site.specie.symbol != "H"] 
-                                for pos in atom_pos], dtype=object)
+                                for pos in atom_pos_c], dtype=object)
+    print("atoms in the cutoff range: %s" %sphere_sites)
 
-    dist = np.array([np.array([site.distance_from_point(atom_pos[idx]) for site in sphere_sites[idx]]) 
-                        for idx in range(len(atom_pos))], dtype=object)
-    potential = np.array([np.array([lj(sphere_sites[i][j].properties["lb_sigma"], sphere_sites[i][j].properties["lb_epsilon"], dist[i][j]) 
+    dist_c = np.array([np.array([site.distance_from_point(atom_pos_c[idx]) for site in sphere_sites[idx]]) 
+                        for idx in range(len(atom_pos_c))], dtype=object)
+    dist_o1 = np.array([np.array([site.distance_from_point(atom_pos_o1[idx]) for site in sphere_sites[idx]]) 
+                        for idx in range(len(atom_pos_o1))], dtype=object)
+    dist_o2 = np.array([np.array([site.distance_from_point(atom_pos_o2[idx]) for site in sphere_sites[idx]]) 
+                        for idx in range(len(atom_pos_o2))], dtype=object)
+    potential_c = np.array([np.array([lj(sphere_sites[i][j].properties["lb_sigma_c"], sphere_sites[i][j].properties["lb_epsilon_c"], dist_c[i][j]) 
                             for j in range(len(sphere_sites[i]))]).flatten() 
-                            for i in range(len(atom_pos))], dtype=object)
+                            for i in range(len(atom_pos_c))], dtype=object)
+    potential_o1 = np.array([np.array([lj(sphere_sites[i][j].properties["lb_sigma_o"], sphere_sites[i][j].properties["lb_epsilon_o"], dist_o1[i][j]) 
+                            for j in range(len(sphere_sites[i]))]).flatten() 
+                            for i in range(len(atom_pos_o1))], dtype=object)
+    potential_o2 = np.array([np.array([lj(sphere_sites[i][j].properties["lb_sigma_o"], sphere_sites[i][j].properties["lb_epsilon_o"], dist_o2[i][j]) 
+                            for j in range(len(sphere_sites[i]))]).flatten() 
+                            for i in range(len(atom_pos_o2))], dtype=object)
+    potential = np.sum([potential_c, potential_o1, potential_o2], axis=0)
+    print(potential)
 
     np.seterr(invalid='ignore')
     mins = [po.min() if len(po)!=0 else np.nan for po in potential]
@@ -97,6 +122,7 @@ def run(structure):
     print("%s Done" %structure)
     return {structure: list(weights)}
 
+
 if __name__ == '__main__':
     structure_lst = os.listdir(nvt_path)
     dumped = {}
@@ -104,9 +130,9 @@ if __name__ == '__main__':
         if os.path.exists(os.path.join(nvt_path, "%s/Movies/System_0/Framework_0_final.vasp" %structure)) == False:
             print("%s undone!" %structure)
             structure_lst.remove(structure)
-    with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
         result = list(executor.map(run, structure_lst))
     for r in result:
         dumped.update(r)
-    with open(os.path.join(rst_path, "weights.json"), "w") as file:
+    with open(os.path.join(rst_path, "weights_%s.json" %threshold), "w") as file:
         json.dump(dumped, file, indent=4)

@@ -1,0 +1,22 @@
+SimulationType               MonteCarlo
+NumberOfCycles               10000
+NumberOfInitializationCycles 6000
+RestartFile                  no
+
+Forcefield                   UFFTraPPE
+CutOffVDW                  12.8
+UseChargesFromCIFFile   yes
+ChargeMethod            Ewald
+
+Framework               0
+FrameworkName           ABETIN_clean
+UnitCells               1 1 1
+ExternalTemperature     298
+Movies                  yes
+WriteMoviesEvery        1
+Component 0 MoleculeName                 CO2
+            MoleculeDefinition           UFFTraPPE
+            TranslationProbability       1.0
+            RotationProbability          1.0
+            ReinsertionProbability       1.0
+            CreateNumberOfMolecules      1
