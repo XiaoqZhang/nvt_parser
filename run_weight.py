@@ -57,10 +57,10 @@ def lj(sigma_lb, epsilon_lb, distance):
 def run(structure):
     print("Pharsing %s" %structure)
     sc = get_supercell(structure)
-    un_cry = Structure.from_file(os.path.join(nvt_path, "%s/Movies/System_0/Framework_0_final_%s_%s_%s_P1.cif" %(structure, sc[0], sc[1], sc[2])))
+    un_cry = Structure.from_file(os.path.join(nvt_path, "%s/%s.cif" %(structure, structure)))
 
     latt = get_lattice(structure)
-    #un_cry.lattice = [np.array(latt[0])/sc[0], np.array(latt[1])/sc[1], np.array(latt[2])/sc[2]]
+    un_cry.lattice = [np.array(latt[0])/sc[0], np.array(latt[1])/sc[1], np.array(latt[2])/sc[2]]
 
 
     ele_sigma = [uff.loc[uff["element"] == site.specie.symbol]["sigma"].values for site in un_cry.sites]
@@ -78,10 +78,11 @@ def run(structure):
     
     with open(os.path.join(nvt_path, "%s/Movies/System_0/Movie_%s_%d.%d.%d_298.000000_0.000000_allcomponents.pdb" %(structure, structure, sc[0], sc[1], sc[2]))) as file:
         data = file.readlines()
-        atom_pos_o1 = np.array([np.array([float(i) for i in line.split()[4:7]]) for line in data if ("ATOM" in line and line[1] == "1")])
-        atom_pos_o2 = np.array([np.array([float(i) for i in line.split()[4:7]]) for line in data if ("ATOM" in line and line[1] == "3")])
-        atom_pos_c = np.array([np.array([float(i) for i in line.split()[4:7]]) for line in data if ("ATOM" in line and line[1] == "2")])
-
+        lines = [line.split() for line in data if "ATOM" in line]
+        atom_pos_c = [np.array([float(t) for t in l[4:7]]) for l in lines if l[1] == '2']
+        atom_pos_o1 = [np.array([float(t) for t in l[4:7]]) for l in lines if l[1] == '1']
+        atom_pos_o2 = [np.array([float(t) for t in l[4:7]]) for l in lines if l[1] == '3']
+    
     sphere_sites = np.array([[site for site in un_cry.get_sites_in_sphere(pt=pos, r=threshold) if site.specie.symbol != "H"] 
                                 for pos in atom_pos_c], dtype=object)
     print("atoms in the cutoff range: %s" %sphere_sites)
@@ -130,7 +131,7 @@ if __name__ == '__main__':
         if os.path.exists(os.path.join(nvt_path, "%s/Movies/System_0/Framework_0_final.vasp" %structure)) == False:
             print("%s undone!" %structure)
             structure_lst.remove(structure)
-    with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
         result = list(executor.map(run, structure_lst))
     for r in result:
         dumped.update(r)
