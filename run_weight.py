@@ -36,6 +36,11 @@ threshold = 20
 nvt_path = "/home/xiaoqi/molsim/co2_nvt_deduplicated"
 rst_path = "./parse_results_co2"
 
+def min_max(numbers):
+    a = np.min(numbers)
+    b = np.max(numbers)
+    return (numbers-a)/(b-a)
+
 def get_supercell(structure):
     with open(os.path.join(nvt_path, "%s/simulation.input" %structure), "r") as f_input:
         for line in f_input:
@@ -76,6 +81,9 @@ def run(structure):
     sc = get_supercell(structure)
     latt, ele, pos = get_lattice(structure)
 
+    # read cif structure
+    cif = Structure.from_file(os.path.join(nvt_path, "%s/%s.cif" %(structure, structure)))
+
     # read gas position
     with open(os.path.join(nvt_path, "%s/Movies/System_0/Movie_%s_%d.%d.%d_298.000000_0.000000_allcomponents.pdb" %(structure, structure, sc[0], sc[1], sc[2]))) as file:
         data = file.readlines()
@@ -84,7 +92,24 @@ def run(structure):
         pos_o1 = np.array([[float(t) for t in l[4:7]] for l in positions if l[1] == '1'])
         pos_o2 = np.array([[float(t) for t in l[4:7]] for l in positions if l[1] == '3'])
     
-    
+    # get sites withine the cutoff range
+    nn = np.array([cif.get_sites_in_sphere(c, threshold) for c in pos_c], dtype=object)
+    nn_dist = np.array([[n.nn_distance for n in s] for s in nn], dtype=object)
+
+    # get uff parameters
+    sigma_c = np.array([(uff[uff["element"]==s.specie.symbol]["sigma"].item()+c_sigma)/2 for s in cif.sites])
+    epsilon_c = np.array([np.sqrt(uff[uff["element"]==s.specie.symbol]["epsilon"].item()*c_epsilon) for s in cif.sites])
+
+    sigma_o = np.array([(uff[uff["element"]==s.specie.symbol]["sigma"].item()+o_sigma)/2 for s in cif.sites])
+    epsilon_o = np.array([np.sqrt(uff[uff["element"]==s.specie.symbol]["epsilon"].item()*o_epsilon) for s in cif.sites])
+
+    for i in range(len(cif.sites)):
+        cif.sites[i].properties = {
+            "sigma_c": sigma_c[i], "epsilon_c": epsilon_c[i], 
+            "sigma_o": sigma_o[i], "epsilon_o": epsilon_o[i]
+            "weight": []
+        }
+    '''
     # calculate distance with periodic boundary conditions
     dist_c = np.array([np.abs([atom-c for atom in pos]) for c in pos_c])
     dist_c = np.array([[[l-r if r>l/2 else r for r,l in zip(a, latt)] for a in s] for s in dist_c])
@@ -103,6 +128,7 @@ def run(structure):
     dist_o2 *= dist_o2
     dist_o2 = np.sum(dist_o2, axis=2)
     dist_o2 = np.sqrt(dist_o2)
+    '''
 
     # read sigma and epsilon
     ele_sigma_c = np.array([(uff[uff["element"]==e]["sigma"].item()+c_sigma)/2 for e in ele])
